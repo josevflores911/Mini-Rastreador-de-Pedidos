@@ -1,5 +1,7 @@
 # 🍽️ Chegô Monolith — Plataforma de Pedidos & Delivery
 
+[ 🇪🇸 Versión en Español ](README.md) | [ 🇧🇷 Versão em Português ](README.pt-BR.md)
+
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.3-brightgreen.svg?logo=springboot)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-17-orange.svg?logo=openjdk)](https://openjdk.org/)
 [![React](https://img.shields.io/badge/React-18.3.1-blue.svg?logo=react)](https://react.dev/)
