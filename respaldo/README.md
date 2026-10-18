@@ -168,25 +168,53 @@ Login e cadastro seguem o desenho do projeto de referência (cartão centralizad
 
 ### Servidor mock (apenas desenvolvimento)
 
-`server/auth.js` implementa `/auth/register`, `/auth/login` e `/auth/verify` com JWT HS256 (módulo `crypto` nativo, sem dependências extras) e exige Bearer em `/orders` e `/restaurants`. Os usuários ficam em `server/users.json` (ignorado pelo git; senhas com scrypt). Variáveis opcionais do servidor: `JWT_SECRET` (sem ela o segredo é aleatório e as sessões caem ao reiniciar), `JWT_EXPIRES_IN` (segundos, padrão 3600) e `MOCK_USER_ROLE` (padrão `ADMIN`). **Não use em produção.**
+## Compilação e Empacotamento do Monolito
 
-## Dados fictícios (apenas desenvolvimento)
+O projeto é compilado e empacotado em um único JAR executável a partir da raiz com um único comando Maven:
 
-`VITE_USE_MOCKS=true` + `npm run dev` usa `src/services/mockOrders.ts` (em memória, inclui criação). Nunca é usado em build de produção. Desative com `VITE_USE_MOCKS=false` (padrão).
+### 1. Build Completo (Frontend + Backend + Testes)
+```bash
+# Windows
+.\mvnw.cmd clean package
 
-## Estrutura
-
+# Linux / macOS
+./mvnw clean package
 ```
-src/
-  auth/         authAdapter.ts (sessão JWT), AuthContext.tsx (useAuth), jwt.ts
-  components/   Layout, Brand, auth/ (AuthLayout, AuthField, PasswordStrength), OrderCard, RestaurantCard, OrderStatusBadge, OrderProgress,
-                StatusActions, StatusSummary, GoogleMap, AddressAutocomplete, Loading, EmptyState
-  context/      ToastContext
-  data/         restaurants.ts (catálogo de restaurantes)
-  hooks/        useOrders, useGoogleMaps
-  pages/        LoginPage, RegisterPage, OrdersPage (abas), CreateOrderPage, OrderDetailsPage, NotFoundPage
-  routes/       authRoutes, orderRoutes, ProtectedRoute, PublicOnlyRoute
-  services/     api (Axios), authService, orderService, orderMapper, mockOrders (dev)
-  types/        order.ts, restaurant.ts
-  utils/        status, format, errors, password
+
+O comando irá:
+1. Executar o módulo `frontend`: baixar Node/npm (caso necessário via `frontend-maven-plugin`), executar `npm install` e `npm run build`.
+2. Executar o módulo `security-server`: integrar os arquivos compilados (`dist/`) nos recursos estáticos de Spring Boot (`classes/static` e `META-INF/resources`), executar os testes automatizados e gerar o fat JAR executável em:
+   `security-server/target/security-server-0.0.1-SNAPSHOT.jar`.
+
+### 2. Executar o JAR Localmente
+```bash
+java -jar security-server/target/security-server-0.0.1-SNAPSHOT.jar
 ```
+Acesse a aplicação completa (SPA React + API REST + Swagger) no navegador:
+* **Frontend SPA:** `http://localhost:8080/`
+* **Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
+
+---
+
+## Deploy no Render Free (via Docker)
+
+O projeto inclui um `Dockerfile` multi-stage pronto para publicação como **Web Service** no Render Free.
+
+### Passo a Passo no Render:
+1. Crie uma conta no [Render](https://render.com/) e conecte seu repositório Git.
+2. Clique em **New +** e selecione **Web Service**.
+3. Escolha o repositório do projeto.
+4. Na configuração do serviço:
+   * **Name:** `chego-monolith` (ou o nome de sua preferência)
+   * **Region:** Escolha a região mais próxima (ex: Oregon ou Frankfurt)
+   * **Branch:** `main`
+   * **Environment:** `Docker`
+   * **Plan:** `Free`
+5. Em **Environment Variables**, configure as seguintes variáveis:
+   | Variável | Valor Recomendado | Descrição |
+   |---|---|---|
+   | `JWT_SECRET` | *(Gere uma chave aleatória com >256 bits)* | Chave de assinatura dos tokens JWT |
+   | `SPRING_DATASOURCE_URL` | `jdbc:sqlite:/tmp/chego.db` ou URL PostgreSQL | Caminho da base de dados (Render Free usa disco efêmero a menos que use PostgreSQL) |
+   | `VITE_GOOGLE_MAPS_API_KEY` | *(Sua chave Google Maps)* | Chave de API para o mapa interativo |
+   | `CORS_ALLOWED_ORIGINS` | `https://seu-app.onrender.com` | Domínio público atribuído pelo Render |
+6. Clique em **Create Web Service**. O Render executará o build Docker em 3 estágios e iniciará o container na porta dinâmica `$PORT`.

@@ -47,10 +47,30 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // Rutas públicas
-                        .requestMatchers("/auth/login", "/auth/register").permitAll()
+                        // Rutas públicas de Autenticación, Documentación y Assets de Frontend SPA
+                        .requestMatchers(
+                                "/",
+                                "/index.html",
+                                "/assets/**",
+                                "/favicon.ico",
+                                "/*.ico",
+                                "/*.svg",
+                                "/*.png",
+                                "/*.jpg",
+                                "/*.css",
+                                "/*.js",
+                                "/login",
+                                "/cadastro",
+                                "/pedidos",
+                                "/pedidos/**",
+                                "/restaurantes/**",
+                                "/auth/login",
+                                "/auth/register",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
                         // Restaurantes y menús accesibles para usuarios autenticados o catálogo público
                         .requestMatchers("/restaurants", "/restaurants/**").authenticated()

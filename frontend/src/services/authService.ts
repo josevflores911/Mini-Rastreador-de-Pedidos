@@ -6,8 +6,9 @@ import { decodeJwt, getExpiryMs } from '../auth/jwt';
  * Usa uma instância própria de Axios, SEM o interceptor de 401 de api.ts:
  * credenciais erradas no login devolvem 401 e não podem derrubar a sessão nem redirecionar.
  */
+const defaultAuthUrl = import.meta.env.DEV ? 'http://localhost:8080/auth' : '/auth';
 const authApi = axios.create({
-  baseURL: import.meta.env.VITE_AUTH_API_URL ?? 'http://localhost:8080/auth',
+  baseURL: import.meta.env.VITE_AUTH_API_URL || defaultAuthUrl,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
 });

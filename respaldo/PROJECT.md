@@ -21,18 +21,22 @@ O **Chegô Rastreio** é uma aplicação frontend Single Page Application (SPA) 
 
 ## 2. Arquitetura e Fluxo de Integração
 
-```
-Usuário ─▶ [Chegô Frontend] ──POST /orders──▶ [API Spring Boot]
-              │   ▲                                  │
-              │   └────── GET /orders, /orders/:id ──┘
-              └──────── PATCH /orders/:id/status ───▶
-```
+O projeto é estruturado como um **Monolito Modular com Maven Multi-módulo**:
+* **`pom.xml` (Raiz):** Orquestrador com `packaging=pom`.
+* **`frontend/` (`chego-frontend`):** Módulo com React 18 + Vite + TypeScript. Compilado via `frontend-maven-plugin` e empacotado como JAR com recursos em `META-INF/resources`.
+* **`security-server/` (`security-server`):** Módulo Spring Boot 3.3.3. Integra os arquivos estáticos compilados em `classes/static`, expõe a API REST, documentação Swagger UI e roteia a SPA pelo mesmo host e porta.
 
-### Fluxo
-1. O usuário escolhe um restaurante na aba **Restaurantes**.
-2. Preenche **Novo pedido** e confirma; o frontend envia `POST /orders` (com `restaurantId`/`restaurantName`).
-3. Após a confirmação do backend, volta a **Meus pedidos**, que recarrega `GET /orders` e exibe o pedido com seu status.
-4. O status só muda na tela depois que o backend confirma o `PATCH`.
+```
+Navegador (Usuário) ──HTTP (Porta dinâmica / 8080)──▶ [Monolito Spring Boot]
+                                                          │
+          ┌───────────────────────────────────────────────┴───────────────────────────────────────────────┐
+          ▼                                                                                               ▼
+[SPA React (index.html, JS, CSS)]                                                          [Endpoints REST API]
+- /                                                                                        - /auth/* (JWT)
+- /login, /cadastro                                                                        - /restaurants/* (Catálogo)
+- /pedidos, /pedidos/:id (Roteamento React)                                                - /orders/* (Ciclo de Vida)
+                                                                                           - /swagger-ui/* (OpenAPI 3)
+```
 
 ---
 
@@ -40,43 +44,38 @@ Usuário ─▶ [Chegô Frontend] ──POST /orders──▶ [API Spring Boot]
 
 | Camada | Tecnologia | Detalhes |
 |---|---|---|
-| **Runtime / Build** | Vite 8 + Node.js | HMR ultrarrápido e bundling otimizado com Rollup |
-| **Linguagem** | TypeScript 5.8+ | Tipagem estrita em toda a base de código |
-| **Framework UI** | React 18.3 | Arquitetura baseada em hooks e componentes funcionais |
-| **Roteamento** | React Router v6 | Lazy loading por rotas e suporte a ProtectedRoute |
-| **Estilização** | Tailwind CSS v3 | Design system utilitário com paleta semântica personalizada |
-| **Ícones** | Lucide React | Biblioteca leve de ícones SVG |
-| **HTTP Client** | Axios | Instância com interceptors; envia `Authorization: Bearer <JWT>` (sem cookies) |
-| **Mapas** | Google Maps JS API + Places (New) + Geocoding | Integração com `@types/google.maps` e fallback elegante |
+| **Arquitetura Geral** | Monolito Modular Maven | Multi-módulo: `chego-monolith`, `chego-frontend` e `security-server` |
+| **Backend & Runtime** | Java 17 + Spring Boot 3.3.3 | REST API, Spring Security 6 stateless com JWT e Flyway |
+| **Frontend UI** | React 18.3 + TypeScript + Vite | SPA com React Router v6, Tailwind CSS e Lucide Icons |
+| **Integração de Build** | `frontend-maven-plugin` | Compilação automatizada do React durante o ciclo de build do Maven |
+| **Documentação API** | Springdoc OpenAPI 3 + Swagger UI | Especificação e interface interativa em `/swagger-ui/index.html` |
+| **Containerização** | Docker Multi-Stage | Imagem leve (`eclipse-temurin:17-jre-jammy`) para Render Free com `$PORT` |
 
 ---
 
-## 4. Estrutura de Diretórios
+## 4. Estrutura de Diretórios Multi-Módulo
 
 ```
-chego/
-├── public/                 # Assets públicos estáticos
-├── server/                 # Servidor mock local (Express + db.json na porta 8080; auth.js = JWT mock)
-├── src/
-│   ├── auth/               # Sessão JWT: authAdapter.ts (storage/expiração), AuthContext.tsx (useAuth), jwt.ts
-│   ├── components/         # Componentes visuais reutilizáveis (Layout, GoogleMap, Status, etc.)
-│   ├── context/            # Contextos React (ex: ToastContext para notificações)
-│   ├── hooks/              # Custom hooks de domínio (useOrders, useGoogleMaps)
-│   ├── data/               # Catálogo local de restaurantes (restaurants.ts)
-│   ├── pages/              # Páginas (LoginPage, RegisterPage, OrdersPage com abas, CreateOrderPage, OrderDetailsPage, NotFoundPage)
-│   ├── routes/             # Rotas (authRoutes, orderRoutes) e guardas (ProtectedRoute, PublicOnlyRoute)
-│   ├── services/           # Comunicação HTTP (api.ts, authService.ts, orderService.ts, orderMapper.ts, mockOrders.ts)
-│   ├── types/              # Definições de tipos e interfaces de domínio (order.ts)
-│   ├── utils/              # Funções utilitárias puras (formatadores, validações, helpers de status)
-│   ├── App.tsx             # Componente raiz da aplicação
-│   ├── main.tsx            # Ponto de montagem React no DOM
-│   └── index.css           # Estilos globais e diretivas do Tailwind CSS
-├── .env.example            # Template de variáveis de ambiente documentado
-├── .env.local              # Configurações e segredos locais (ignorado no git)
-├── package.json            # Scripts e dependências do projeto
-├── tailwind.config.js      # Customização de temas e cores
-├── tsconfig.json           # Configurações do compilador TypeScript
-└── vite.config.ts          # Configurações do Vite
+chego-auth/
+├── pom.xml                     # POM Raiz agregador (packaging=pom)
+├── mvnw / mvnw.cmd / .mvn/     # Maven Wrapper universal
+├── Dockerfile                  # Multi-stage Dockerfile otimizado para Render
+├── .dockerignore               # Regras de exclusão para Docker
+├── .env.example                # Template de variáveis de ambiente com valores fictícios
+├── frontend/                   # Módulo Frontend (chego-frontend)
+│   ├── pom.xml                 # Build Maven com frontend-maven-plugin
+│   ├── package.json            # Scripts e dependências do Vite/React
+│   ├── vite.config.ts          # Configuração do Vite
+│   ├── index.html              # Shell HTML da SPA
+│   ├── src/                    # Código-fonte React (páginas, componentes, hooks, auth)
+│   └── public/                 # Assets estáticos
+├── security-server/            # Módulo Backend Spring Boot (security-server)
+│   ├── pom.xml                 # Dependência de chego-frontend e Spring Boot plugin
+│   └── src/
+│       ├── main/java/          # Controllers, Services, Entidades, DTOs e Segurança
+│       │   └── .../SpaForwardController.java # Encaminhamento de rotas SPA
+│       └── main/resources/     # application.properties, db/migration (Flyway)
+└── target/                     # Diretórios de build de cada módulo
 ```
 
 ---

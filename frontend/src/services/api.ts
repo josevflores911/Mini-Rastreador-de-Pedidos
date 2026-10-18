@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { getToken, onSessionExpired } from '../auth/authAdapter';
 
+const defaultBaseUrl = import.meta.env.DEV ? 'http://localhost:8080/' : '/';
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/',
+  baseURL: import.meta.env.VITE_API_BASE_URL || defaultBaseUrl,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
 });
