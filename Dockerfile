@@ -1,52 +1,68 @@
 # ==============================================================================
-# ESTÁGIO 1: Build do Frontend React (Node.js 20)
+# STAGE 1: Build del Frontend React + Vite
 # ==============================================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
+
 WORKDIR /app/frontend
 
-COPY frontend/package*.json ./
+# Copiar manifiestos de dependencias
+COPY frontend/package.json frontend/package-lock.json ./
+
+# Instalar dependencias respetando el lockfile
 RUN npm ci
 
+# Copiar código fuente y compilar React
 COPY frontend/ ./
+
 RUN npm run build
 
+
 # ==============================================================================
-# ESTÁGIO 2: Build do Backend e Empacotamento do JAR Único (Maven + Temurin 17)
+# STAGE 2: Build del Backend y empaquetado del JAR
 # ==============================================================================
 FROM maven:3.9.6-eclipse-temurin-17-alpine AS backend-builder
+
 WORKDIR /app
 
+# Archivos Maven del proyecto raíz y módulos
 COPY pom.xml ./
 COPY security-server/pom.xml ./security-server/
-COPY frontend/pom.xml ./frontend/
+COPY frontend/ ./frontend/
 
-# Copia os arquivos compilados do frontend para os recursos estáticos do Spring Boot
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
-COPY --from=frontend-builder /app/frontend/dist ./security-server/src/main/resources/static
-
+# Copiar el código fuente del backend
 COPY security-server/src ./security-server/src
 
-# Empacota o JAR executável único ignorando testes para build rápido em container
+# Integrar los archivos estáticos del frontend en Spring Boot
+COPY --from=frontend-builder /app/frontend/dist/ \
+    ./security-server/src/main/resources/static/
+
+# Compilar el proyecto y sus módulos requeridos
 RUN mvn clean package -pl security-server -am -DskipTests
 
+
 # ==============================================================================
-# ESTÁGIO 3: Imagem Final de Execução (Minimal JRE 17) Otimizada para Render Free
+# STAGE 3: Imagen final de ejecución
 # ==============================================================================
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:17-jre-jammy AS runtime
+
 WORKDIR /app
 
-# Criação de usuário e grupo não-root por boas práticas de segurança
-RUN groupadd -r chego && useradd -r -g chego chego
-RUN chown -R chego:chego /app
+# Crear usuario no privilegiado
+RUN groupadd --system chego \
+    && useradd --system --gid chego --no-create-home chego
 
-# Copia o JAR único executável
-COPY --from=backend-builder --chown=chego:chego /app/security-server/target/security-server-*.jar app.jar
+# Copiar el JAR generado
+COPY --from=backend-builder \
+    --chown=chego:chego \
+    /app/security-server/target/security-server-*.jar \
+    /app/app.jar
 
-# Render injeta a porta dinamicamente na variável de ambiente $PORT
+# Puerto configurable por el entorno (por ejemplo, Render)
 ENV PORT=8080
 ENV SPRING_PROFILES_ACTIVE=prod
+
 EXPOSE 8080
 
 USER chego
 
-ENTRYPOINT ["sh", "-c", "java -Djava.security.egd=file:/dev/./urandom -Dserver.port=${PORT} -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "exec java -Djava.security.egd=file:/dev/./urandom -Dserver.port=${PORT} -jar /app/app.jar"]
